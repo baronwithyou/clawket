@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ChevronRight } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ModalSheet, ThemedSwitch } from '../ui';
 import { useAppTheme } from '../../theme';
 import { useAppContext } from '../../contexts/AppContext';
+import { useProPaywall } from '../../contexts/ProPaywallContext';
 import { useGatewayToolSettings } from '../../screens/ConfigScreen/hooks/useGatewayToolSettings';
+import { openOpenClawPermissions } from '../../screens/ConfigScreen/GatewayToolsScreen';
 import { FontSize, FontWeight, Radius, Space } from '../../theme/tokens';
-import type { ExecAsk } from '../../utils/gateway-tool-settings';
 
 type Props = {
   visible: boolean;
@@ -16,7 +17,7 @@ type Props = {
 };
 
 export function WebSearchModal({ visible, onClose }: Props): React.JSX.Element {
-  const { t } = useTranslation('chat');
+  const { t } = useTranslation(['chat', 'config']);
 
   return (
     <ModalSheet visible={visible} onClose={onClose} title={t('Tools')} maxHeight="60%">
@@ -26,9 +27,10 @@ export function WebSearchModal({ visible, onClose }: Props): React.JSX.Element {
 }
 
 function WebSearchModalContent({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const { t } = useTranslation('chat');
+  const { t } = useTranslation(['chat', 'config']);
   const { theme } = useAppTheme();
   const { gateway, gatewayEpoch, config } = useAppContext();
+  const { requirePro } = useProPaywall();
   const navigation = useNavigation();
   const hasActiveGateway = Boolean(config?.url);
   const toolSettings = useGatewayToolSettings({ gateway, gatewayEpoch, hasActiveGateway });
@@ -36,12 +38,6 @@ function WebSearchModalContent({ onClose }: { onClose: () => void }): React.JSX.
   const { colors } = theme;
   const loading = toolSettings.loadingToolSettings;
   const disabled = !hasActiveGateway || loading;
-
-  const execAskOptions = useMemo<{ key: ExecAsk; label: string }[]>(() => [
-    { key: 'always', label: t('Every Command') },
-    { key: 'on-miss', label: t('Unknown Only') },
-    { key: 'off', label: t('Never') },
-  ], [t]);
 
   const handleOpenToolSettings = () => {
     onClose();
@@ -51,6 +47,12 @@ function WebSearchModalContent({ onClose }: { onClose: () => void }): React.JSX.
     if (root) {
       root.dispatch(CommonActions.navigate({ name: 'ToolList' }));
     }
+  };
+
+  const handleOpenPermissions = () => {
+    if (!requirePro('configBackups')) return;
+    onClose();
+    openOpenClawPermissions(navigation);
   };
 
   return (
@@ -84,29 +86,17 @@ function WebSearchModalContent({ onClose }: { onClose: () => void }): React.JSX.
         />
       </View>
 
-      {/* Exec Approval */}
+      {/* OpenClaw permissions */}
       <View style={styles.divider} />
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>{t('Exec Approval')}</Text>
-        <Text style={styles.rowMeta}>{t('Ask for your approval before the agent runs a command')}</Text>
-        <View style={styles.chipRow}>
-          {execAskOptions.map((option) => {
-            const active = option.key === toolSettings.execAsk;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => toolSettings.setExecAsk(option.key)}
-                style={[styles.chip, active && styles.chipActive]}
-                disabled={disabled}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      <TouchableOpacity
+        style={styles.moreButton}
+        onPress={handleOpenPermissions}
+        activeOpacity={0.7}
+        disabled={disabled}
+      >
+        <Text style={styles.rowLabel}>{t('OpenClaw Permission Management', { ns: 'config' })}</Text>
+        <ChevronRight size={16} color={colors.textMuted} strokeWidth={2} />
+      </TouchableOpacity>
 
       {/* More Tool Settings */}
       <View style={styles.divider} />
@@ -137,7 +127,6 @@ function createStyles(colors: ReturnType<typeof useAppTheme>['theme']['colors'])
   return StyleSheet.create({
     content: {
       paddingBottom: Space.md,
-      minHeight: 280,
     },
     row: {
       paddingHorizontal: Space.lg,
@@ -167,40 +156,13 @@ function createStyles(colors: ReturnType<typeof useAppTheme>['theme']['colors'])
       backgroundColor: colors.borderStrong,
       marginLeft: Space.lg,
     },
-    chipRow: {
-      flexDirection: 'row',
-      gap: Space.sm,
-      marginTop: Space.sm,
-      flexWrap: 'wrap',
-    },
-    chip: {
-      paddingHorizontal: Space.md,
-      paddingVertical: 7,
-      borderRadius: Radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceMuted,
-    },
-    chipActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    chipText: {
-      fontSize: FontSize.sm,
-      fontWeight: FontWeight.medium,
-      color: colors.text,
-    },
-    chipTextActive: {
-      color: colors.primaryText,
-      fontWeight: FontWeight.semibold,
-    },
     moreButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: Space.lg,
       paddingVertical: 13,
-      marginTop: Space.sm,
+      marginVertical: Space.sm,
     },
     moreButtonText: {
       color: colors.textMuted,

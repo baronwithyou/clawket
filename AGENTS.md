@@ -27,6 +27,10 @@ This monorepo is in the first migration phase:
 3. Prefer path fixes and workspace orchestration over logic refactors.
 4. Do not mix protocol redesign with structural migration.
 
+## Repository Instruction Rule
+
+When work touches a specific workspace or subdirectory, read the closest applicable `CLAUDE.md` for that area before making changes. Do not start implementation based only on the monorepo root instructions when a more specific directory-level instruction file exists.
+
 ## Documentation Rule
 
 If you update `README.md`, you must update `README.zh-CN.md` in the same change so the English and Chinese versions stay aligned.

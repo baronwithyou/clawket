@@ -357,8 +357,8 @@ export function OpenClawConfigScreen(): React.JSX.Element {
           styles={styles}
           chevronColor={theme.colors.textSubtle}
           icon={(
-            <View style={[styles.rowIconBadge, { backgroundColor: '#E8F7F0' }]}>
-              <Shield size={17} strokeWidth={2.2} color="#18794E" />
+            <View style={[styles.rowIconBadge, { backgroundColor: '#E8F1FF' }]}>
+              <Shield size={17} strokeWidth={2.2} color="#2563EB" />
             </View>
           )}
         />

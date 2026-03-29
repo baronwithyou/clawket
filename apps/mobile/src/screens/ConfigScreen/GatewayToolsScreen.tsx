@@ -29,7 +29,7 @@ import { useGatewayToolSettings } from './hooks/useGatewayToolSettings';
 type Colors = AppTheme['colors'];
 
 export function openOpenClawPermissions(navigation: {
-  getState?: () => { routeNames?: string[] };
+  getState?: () => { routeNames?: string[] } | undefined;
   getParent?: () => any;
   dispatch: (...args: any[]) => void;
 }): void {
@@ -158,8 +158,8 @@ export function ToolSettingsContent({
         ]}
       >
         <View style={styles.rowLead}>
-          <View style={[styles.rowIconBadge, { backgroundColor: '#E8F7F0' }]}>
-            <Shield size={17} strokeWidth={2.2} color="#18794E" />
+          <View style={[styles.rowIconBadge, { backgroundColor: '#E8F1FF' }]}>
+            <Shield size={17} strokeWidth={2.2} color="#2563EB" />
           </View>
           <View style={styles.rowText}>
             <Text style={styles.rowTitle}>{t('OpenClaw Permission Management')}</Text>
