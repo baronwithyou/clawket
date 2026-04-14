@@ -1,4 +1,4 @@
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import i18next from '../i18n';
 
@@ -28,7 +28,7 @@ type ChatNotificationRequest = {
   sessionKey: string;
 };
 
-const CHAT_REPLY_NOTIFICATIONS_ENABLED = false;
+const CHAT_REPLY_NOTIFICATIONS_ENABLED = true;
 
 let notificationHandlerInitialized = false;
 const recentNotificationKeys = new Map<string, number>();
@@ -81,7 +81,7 @@ function makeRecentNotificationKey(request: ChatNotificationRequest): string {
 
 export function initializeChatNotifications(): void {
   if (!CHAT_REPLY_NOTIFICATIONS_ENABLED) return;
-  if (Platform.OS !== 'ios' || notificationHandlerInitialized) return;
+  if (notificationHandlerInitialized) return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -95,7 +95,6 @@ export function initializeChatNotifications(): void {
 
 export async function ensureChatNotificationPermissions(): Promise<boolean> {
   if (!CHAT_REPLY_NOTIFICATIONS_ENABLED) return false;
-  if (Platform.OS !== 'ios') return false;
   let permissions = await Notifications.getPermissionsAsync();
   if (permissions.granted) return true;
   if (AppState.currentState !== 'active') return false;
@@ -107,7 +106,6 @@ export async function scheduleChatReplyNotification(
   request: ChatNotificationRequest,
 ): Promise<boolean> {
   if (!CHAT_REPLY_NOTIFICATIONS_ENABLED) return false;
-  if (Platform.OS !== 'ios') return false;
   initializeChatNotifications();
   const hasPermission = await ensureChatNotificationPermissions();
   if (!hasPermission) return false;

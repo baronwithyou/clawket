@@ -50,7 +50,7 @@ import { NodeClient } from './src/services/node-client';
 import { dispatchNodeInvoke } from './src/services/node-invoke-dispatcher';
 import { NodeCapabilityToggles } from './src/services/node-capabilities';
 import { shouldProbeGatewayOnForegroundResume } from './src/services/foregroundReconnectPolicy';
-import { shouldRunGatewayKeepAlive } from './src/services/gatewayKeepAlivePolicy';
+import { shouldRunGatewayKeepAlive, BACKGROUND_KEEPALIVE_WINDOW_MS } from './src/services/gatewayKeepAlivePolicy';
 import { logAppTelemetry } from './src/services/app-telemetry';
 import {
   extractChatNotificationOpenPayload,
@@ -393,6 +393,7 @@ function AppContent({
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const backgroundedAtRef = useRef<number | null>(null);
   const gatewayKeepAliveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastChatRunStartAtMsRef = useRef<number | undefined>(undefined);
 
   // Load saved agent avatars on mount
   useEffect(() => { loadAgentAvatars().then(setAgentAvatars).catch(() => {}); }, []);
@@ -425,6 +426,14 @@ function AppContent({
   useEffect(() => {
     initializeChatNotifications();
   }, []);
+
+  // Track last chat run start time for Android background keepalive window
+  useEffect(() => {
+    const off = gateway.on('chatRunStart', () => {
+      lastChatRunStartAtMsRef.current = Date.now();
+    });
+    return off;
+  }, [gateway]);
 
   // Mark unread when chatFinal arrives while not on Chat tab
   useEffect(() => {
@@ -541,7 +550,7 @@ function AppContent({
 
   const syncGatewayKeepAlive = useCallback(() => {
     const hasGatewayConfig = Boolean(config?.url);
-    const shouldRun = hasGatewayConfig && shouldRunGatewayKeepAlive(gateway.getConnectionState(), appStateRef.current);
+    const shouldRun = hasGatewayConfig && shouldRunGatewayKeepAlive(gateway.getConnectionState(), appStateRef.current, undefined, lastChatRunStartAtMsRef.current);
     if (!shouldRun) {
       clearGatewayKeepAliveTimer();
       return;
@@ -549,7 +558,7 @@ function AppContent({
     if (gatewayKeepAliveTimerRef.current) return;
 
     gatewayKeepAliveTimerRef.current = setInterval(() => {
-      const stillRunnable = Boolean(config?.url) && shouldRunGatewayKeepAlive(gateway.getConnectionState(), appStateRef.current);
+      const stillRunnable = Boolean(config?.url) && shouldRunGatewayKeepAlive(gateway.getConnectionState(), appStateRef.current, undefined, lastChatRunStartAtMsRef.current);
       if (!stillRunnable) {
         clearGatewayKeepAliveTimer();
         return;
@@ -600,8 +609,18 @@ function AppContent({
 
       const awayMs = backgroundedAtRef.current ? Date.now() - backgroundedAtRef.current : 0;
       backgroundedAtRef.current = null;
-      setForegroundEpoch((prev) => prev + 1);
       const state = gateway.getConnectionState();
+      // On Android, if the WS was kept alive in background (connection still ready within the
+      // keepalive window), the chat state is already current from background events. Skip the
+      // foreground epoch increment to avoid a redundant history reload that would duplicate messages.
+      const wsWasKeptAliveInBackground =
+        Platform.OS === 'android' &&
+        state === 'ready' &&
+        lastChatRunStartAtMsRef.current !== undefined &&
+        Date.now() - lastChatRunStartAtMsRef.current < BACKGROUND_KEEPALIVE_WINDOW_MS;
+      if (!wsWasKeptAliveInBackground) {
+        setForegroundEpoch((prev) => prev + 1);
+      }
       const shouldProbe = shouldProbeGatewayOnForegroundResume({
         platformOs: Platform.OS,
         awayMs,
@@ -720,8 +739,6 @@ function AppContent({
   }, [openChatFromNotification]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-
     const off = gateway.on('chatFinal', ({ sessionKey, message, runId }) => {
       if (!sessionKey) return;
       if (isAssistantSilentReplyMessage(message)) return;
